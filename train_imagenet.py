@@ -41,7 +41,7 @@ model_names = sorted(name for name in models.__dict__
 parser = argparse.ArgumentParser(description='BYOL for RetinaMNIST')
 parser.add_argument('--data', choices=['DermaMNIST', 'BloodMNIST', 'PathMNIST', 'RetinaMNIST'], default='RetinaMNIST',
                     help='Dataset Type within MedMNIST V2 for self-supervised pretraining')
-parser.add_argument('--optimizer', choices=['sgd', 'adam'], default='sgd')
+parser.add_argument('--optimizer', choices=['sgd', 'adam', 'adamw'], default='adamw')
 parser.add_argument('--if-LARS', action='store_true', help='whether to use LARS')
 parser.add_argument('--supervised', action='store_true', help='whether to perform supervised learning')
 parser.add_argument('--arch', metavar='ARCH', default='resnet18', choices=model_names,
@@ -81,7 +81,7 @@ parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
 parser.add_argument('--gpu', default=0, type=int,
                     help='GPU id to use.')
-parser.add_argument('--scheduler', default='milestone', choices=[None, 'single', 'multi', 'milestone'], help='scheduler type. None for no scheduler.')
+parser.add_argument('--scheduler', default='single', choices=[None, 'single', 'multi', 'milestone'], help='scheduler type. None for no scheduler.')
 parser.add_argument('--multiprocessing-distributed', action='store_true',
                     help='Use multi-processing distributed training to launch '
                          'N processes per node, which has N GPUs. This is the '
@@ -95,17 +95,23 @@ best_loss = 99999.9
 def main():
     args = parser.parse_args()
     # args.if_lars = True
+    # args.batch_size = 1024
+    args.optimizer = 'sgd'
+    # args.if_LARS = True
+    # args.scheduler = 'single'
+#    args.weight_decay = 0
+    
     args.supervised = True
-    args.identifier = f'zpretrained_{args.pretrained}_lr_{args.lr}_wd_{args.weight_decay}'
+    args.identifier = f'pretrained_{args.pretrained}_lr_{args.lr}_wd_{args.weight_decay}_opt_{args.optimizer}'
     if args.supervised:
-        args.fn_result = f'zsupervised_imagenet_pretrained_{args.pretrained}'
+        args.fn_result = f'supervised_imagenet_pretrained_{args.pretrained}_{args.optimizer}'
     else:
-        args.fn_result = f'zselfsupervised_imagenet_pretrained_{args.pretrained}'
+        args.fn_result = f'selfsupervised_imagenet_pretrained_{args.pretrained}_{args.optimizer}'
 
     if not os.path.isfile(f'results/{args.fn_result}.csv'):
         with open(f'results/{args.fn_result}.csv', "w") as f:
             writer = csv.writer(f)
-            writer.writerow(['lr_init', 'wd_ratio', 'auc_val', 'acc_val', 'loss_val', 'auc_test', 'acc_test', 'loss_test'])
+            writer.writerow(['lr_init', 'weight_decay', 'optimizer', 'seed', 'if_lars', 'auc_val', 'acc_val', 'loss_val', 'auc_test', 'acc_test', 'loss_test'])
     
 
     if args.seed is not None:
@@ -278,6 +284,8 @@ def main_worker(gpu, ngpus_per_node, args):
                                 weight_decay=args.weight_decay)
     elif args.optimizer == 'adam':
         _optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    elif args.optimizer == 'adamw':
+        _optimizer = torch.optim.AdamW(model.net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     else:
         raise ValueError('Incorrect optimizer!!!')
 
@@ -296,6 +304,8 @@ def main_worker(gpu, ngpus_per_node, args):
                                                 cycle_momentum=args.momentum)
     elif args.scheduler == 'milestone':
         scheduler = MultiStepLR(_optimizer, milestones=[25, 75], gamma=0.1)
+    elif args.scheduler == None:
+        scheduler = None
 
     # optionally resume from a checkpoint
     if args.resume:
@@ -371,11 +381,10 @@ def main_worker(gpu, ngpus_per_node, args):
 
     loss_test, auc_test, acc_test = validate(loader_test, model, criterion, evaluator_test, args)
 
-    
-    df = pd.DataFrame({'lr_init':[args.lr], 'wd_ratio':[args.weight_decay], 'auc_val':[best_auc], 'acc_val':[best_acc], 'loss_val':[best_loss],
+    df = pd.DataFrame({'lr_init':[args.lr], 'weight_decay': [args.weight_decay], 'optimizer':[args.optimizer], 'seed':[args.seed], 'if_lars':[args.if_LARS], 'auc_val':[best_auc], 'acc_val':[best_acc], 'loss_val':[best_loss],
     'auc_test':[auc_test], 'acc_test':[acc_test], 'loss_test':[loss_test]})
     df.to_csv(f'results/{args.fn_result}.csv', mode='a', index=False, header=False)
-
+    os.remove(args.identifier)
 def train(train_loader, model, criterion, optimizer, scheduler, args):
     # batch_time = AverageMeter('Time', ':6.3f')
     # data_time = AverageMeter('Data', ':6.3f')

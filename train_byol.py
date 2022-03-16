@@ -38,7 +38,7 @@ model_names = sorted(name for name in models.__dict__
 parser = argparse.ArgumentParser(description='BYOL for RetinaMNIST')
 parser.add_argument('--data', choices=['DermaMNIST', 'BloodMNIST', 'PathMNIST', 'RetinaMNIST'], default='RetinaMNIST',
                     help='Dataset Type within MedMNIST V2 for self-supervised pretraining')
-parser.add_argument('--optimizer', choices=['sgd', 'adam'], default='sgd')
+parser.add_argument('--optimizer', choices=['sgd', 'adam', 'adamw'], default='adamw')
 parser.add_argument('--if-LARS', action='store_true', help='whether to use LARS')
 parser.add_argument('--supervised', action='store_true', help='whether to perform supervised learning')
 parser.add_argument('--arch', metavar='ARCH', default='resnet18', choices=model_names,
@@ -91,8 +91,9 @@ best_loss = 999999
 def main():
     args = parser.parse_args()
     args.if_lars = True
-    args.pretrained = True
-    args.identifier = f'data_{args.data}_lr_{args.lr}_wd_{args.weight_decay}'
+    args.supervised = False
+    # args.pretrained = True
+    args.identifier = f'data_{args.data}_lr_{args.lr}_wd_{args.weight_decay}_optimizer_{args.optimizer}_seed_{args.seed}'
     if args.supervised:
         args.fn_result = f'supervised_{args.data}'
     else:
@@ -101,7 +102,7 @@ def main():
     if not os.path.isfile(f'results/{args.fn_result}.csv'):
         with open(f'results/{args.fn_result}.csv', "w") as f:
             writer = csv.writer(f)
-            writer.writerow(['lr_init', 'wd_ratio', 'loss'])
+            writer.writerow(['lr_init', 'wd_ratio', 'seed', 'optimizer', 'loss'])
     
 
     if args.seed is not None:
@@ -252,6 +253,8 @@ def main_worker(gpu, ngpus_per_node, args):
                                 weight_decay=args.weight_decay)
     elif args.optimizer == 'adam':
         _optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    elif args.optimizer == 'adamw':
+        _optimizer = torch.optim.AdamW(model.net.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     else:
         raise ValueError('Incorrect optimizer!!!')
 
@@ -322,9 +325,10 @@ def main_worker(gpu, ngpus_per_node, args):
                 'optimizer': optimizer.state_dict(),
             }, is_best, args)
 
-    df = pd.DataFrame({'lr_init':[args.lr], 'wd_ratio':[args.weight_decay], 'loss':[best_loss]})
+    df = pd.DataFrame({'lr_init':[args.lr], 'wd_ratio':[args.weight_decay], 'seed':[args.seed], 'optimizer':[args.optimizer], 'loss':[best_loss]})
     df.to_csv(f'results/{args.fn_result}.csv', mode='a', index=False, header=False)
-
+    os.remove(args.identifier)
+    
 def train(train_loader, model, criterion, optimizer, scheduler, args):
     # batch_time = AverageMeter('Time', ':6.3f')
     # data_time = AverageMeter('Data', ':6.3f')
