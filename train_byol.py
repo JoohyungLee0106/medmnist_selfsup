@@ -93,7 +93,7 @@ def main():
     args.if_lars = True
     args.supervised = False
     # args.pretrained = True
-    args.identifier = f'data_{args.data}_lr_{args.lr}_wd_{args.weight_decay}_optimizer_{args.optimizer}_seed_{args.seed}'
+    args.identifier = f'data_{args.data}_lr_{args.lr}_wd_{args.weight_decay}_pretrained_{args.pretrained}_seed_{args.seed}'
     if args.supervised:
         args.fn_result = f'supervised_{args.data}'
     else:
@@ -102,7 +102,7 @@ def main():
     if not os.path.isfile(f'results/{args.fn_result}.csv'):
         with open(f'results/{args.fn_result}.csv', "w") as f:
             writer = csv.writer(f)
-            writer.writerow(['lr_init', 'wd_ratio', 'seed', 'optimizer', 'loss'])
+            writer.writerow(['lr_init', 'wd_ratio', 'pretrained', 'seed', 'optimizer', 'loss'])
     
 
     if args.seed is not None:
@@ -203,7 +203,7 @@ def main_worker(gpu, ngpus_per_node, args):
     AUG_ss = torch.nn.Sequential(
         T.RandomRotation(degrees=180, interpolation=F.InterpolationMode.BILINEAR),
         RandomApply(
-            T.ColorJitter(0.8, 0.8, 0.8, 0.2),
+            T.ColorJitter(0.9, 0.9, 0.9, 0.2),
             p=0.3
         ),
         # T.RandomGrayscale(p=0.2),
@@ -325,7 +325,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'optimizer': optimizer.state_dict(),
             }, is_best, args)
 
-    df = pd.DataFrame({'lr_init':[args.lr], 'wd_ratio':[args.weight_decay], 'seed':[args.seed], 'optimizer':[args.optimizer], 'loss':[best_loss]})
+    df = pd.DataFrame({'lr_init':[args.lr], 'wd_ratio':[args.weight_decay], 'pretrained':[args.pretrained], 'seed':[args.seed], 'optimizer':[args.optimizer], 'loss':[best_loss]})
     df.to_csv(f'results/{args.fn_result}.csv', mode='a', index=False, header=False)
     os.remove(args.identifier)
     
@@ -360,6 +360,7 @@ def train(train_loader, model, criterion, optimizer, scheduler, args):
         # loss.backward()
         # optimizer.step()
         scaler.step(optimizer)
+        model.update_moving_average()
         scaler.update()
 
         epoch_loss += loss.item()
