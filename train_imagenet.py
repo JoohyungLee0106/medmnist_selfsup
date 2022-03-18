@@ -318,9 +318,9 @@ def main_worker(gpu, ngpus_per_node, args):
         return
 
     # roc_auc = ROC_AUC()
-    evaluator_train = Evaluator('retinamnist', 'train', root='/home/joohyung/Codes_Research/mednist_selfsup/data')
-    evaluator_val = Evaluator('retinamnist', 'val', root='/home/joohyung/Codes_Research/mednist_selfsup/data')
-    evaluator_test = Evaluator('retinamnist', 'test', root='/home/joohyung/Codes_Research/mednist_selfsup/data')
+    evaluator_train = Evaluator('retinamnist', 'train', root='./data')
+    evaluator_val = Evaluator('retinamnist', 'val', root='./data')
+    evaluator_test = Evaluator('retinamnist', 'test', root='./data')
 
     for epoch in range(args.epochs):
         print(f'Epoch: {epoch}')
