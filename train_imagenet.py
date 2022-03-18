@@ -96,7 +96,7 @@ def main():
     args = parser.parse_args()
     # args.if_lars = True
     # args.batch_size = 1024
-    args.optimizer = 'sgd'
+#    args.optimizer = 'sgd'
     # args.if_LARS = True
     # args.scheduler = 'single'
 #    args.weight_decay = 0
@@ -111,7 +111,7 @@ def main():
     if not os.path.isfile(f'results/{args.fn_result}.csv'):
         with open(f'results/{args.fn_result}.csv', "w") as f:
             writer = csv.writer(f)
-            writer.writerow(['lr_init', 'weight_decay', 'optimizer', 'seed', 'if_lars', 'auc_val', 'acc_val', 'loss_val', 'auc_test', 'acc_test', 'loss_test'])
+            writer.writerow(['lr_init', 'weight_decay', 'optimizer', 'scheduler', 'seed', 'auc_val', 'acc_val', 'loss_val', 'auc_test', 'acc_test', 'loss_test'])
     
 
     if args.seed is not None:
@@ -209,28 +209,10 @@ def main_worker(gpu, ngpus_per_node, args):
         else:
             model = torch.nn.DataParallel(model).cuda()
 
-    AUG_ss = torch.nn.Sequential(
-        T.RandomRotation(degrees=180, interpolation=F.InterpolationMode.BILINEAR),
-        RandomApply(
-            T.ColorJitter(0.8, 0.8, 0.8, 0.2),
-            p=0.3
-        ),
-        # T.RandomGrayscale(p=0.2),
-        T.RandomHorizontalFlip(),
-        RandomApply(
-            T.GaussianBlur((3, 3), (1.0, 2.0)),
-            p=0.2
-        ),
-        T.RandomResizedCrop(size=(28, 28), scale=(0.8, 1.0)),
-        # T.Normalize(
-        #     mean=torch.tensor([0.485, 0.456, 0.406]),
-        #     std=torch.tensor([0.229, 0.224, 0.225])),
-    )
-
     AUG_s = T.Compose([
         T.RandomRotation(degrees=180, interpolation=F.InterpolationMode.BILINEAR),
         T.RandomApply(
-            [T.ColorJitter(0.8, 0.8, 0.8, 0.2)],
+            [T.ColorJitter(0.9, 0.9, 0.9, 0.2)],
             p=0.3
         ),
         # T.RandomGrayscale(p=0.2),
@@ -246,7 +228,7 @@ def main_worker(gpu, ngpus_per_node, args):
         #     std=torch.tensor([0.229, 0.224, 0.225])),
 
     ])
-
+    
     if args.supervised:     
         # model = BYOL(model, image_size=28, hidden_layer=-2)
         # model = BYOL(model, image_size=28, hidden_layer=-2, augment_fn=AUG_ss)
@@ -381,7 +363,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     loss_test, auc_test, acc_test = validate(loader_test, model, criterion, evaluator_test, args)
 
-    df = pd.DataFrame({'lr_init':[args.lr], 'weight_decay': [args.weight_decay], 'optimizer':[args.optimizer], 'seed':[args.seed], 'if_lars':[args.if_LARS], 'auc_val':[best_auc], 'acc_val':[best_acc], 'loss_val':[best_loss],
+    df = pd.DataFrame({'lr_init':[args.lr], 'weight_decay': [args.weight_decay], 'optimizer':[args.optimizer], 'scheduler':[args.scheduler], 'seed':[args.seed], 'auc_val':[best_auc], 'acc_val':[best_acc], 'loss_val':[best_loss],
     'auc_test':[auc_test], 'acc_test':[acc_test], 'loss_test':[loss_test]})
     df.to_csv(f'results/{args.fn_result}.csv', mode='a', index=False, header=False)
     os.remove(args.identifier)
