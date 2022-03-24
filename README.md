@@ -1,1 +1,1 @@
-# mednist_selfsup
+# MedMNIST_selfsup
