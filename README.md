@@ -1,5 +1,8 @@
 # MedMNIST_selfsup
 
+## Dependency
+install byol_pytorch from https://github.com/lucidrains/byol-pytorch
+
 ## train_byol.py
 Self-Supervised pretraining
 
